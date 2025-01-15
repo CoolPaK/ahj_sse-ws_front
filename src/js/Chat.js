@@ -127,7 +127,7 @@ export default class Chat {
       e.preventDefault();
       if (formInput.value.trim()) {
         const data = { name: formInput.value };
-        fetch('http://localhost:8080/new-user', {
+        fetch('https://ahj-sse-ws-server-jnxt.onrender.com/new-user', {
           method: 'POST',
           body: JSON.stringify(data),
         }).then((responce) => {
@@ -135,7 +135,7 @@ export default class Chat {
             this.user = formInput.value;
             this.modal.deleteModal();
             this.bindToDOM();
-            this.websocket = new WebSocket('wss://localhost:8080');
+            this.websocket = new WebSocket('wss://ahj-sse-ws-server-jnxt.onrender.com');
             this.websocketOnEvents();
             this.subscribeOnEvents();
           }
