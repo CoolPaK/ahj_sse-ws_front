@@ -44,5 +44,13 @@
   },
   "dependencies": {
     "core-js": "^3.29.1"
-  }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/CoolPaK/ahj_sse-ws_front.git"
+  },
+  "bugs": {
+    "url": "https://github.com/CoolPaK/ahj_sse-ws_front/issues"
+  },
+  "homepage": "https://github.com/CoolPaK/ahj_sse-ws_front#readme"
 }
