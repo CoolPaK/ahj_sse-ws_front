@@ -4,7 +4,7 @@ stack: node 20  # окружение
 
 branches:
   only:
-    - master  # ветка git
+    # - master  # ветка git
     - main
 
 cache:
