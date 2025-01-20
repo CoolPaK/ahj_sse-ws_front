@@ -1,6 +1,10 @@
 /* eslint-disable linebreak-style */
+/* eslint-disable class-methods-use-this */
+/* eslint-disable no-unused-vars */
 import Modal from './Modal';
 import formatDate from './utils';
+
+const BASE_URL = 'https://ahj-sse-ws-server-jnxt.onrender.com'; // Базовый URL для API
 
 export default class Chat {
   constructor(container) {
@@ -51,103 +55,134 @@ export default class Chat {
     const messagesContainer = this.container.querySelector(
       '.chat__messages-container',
     );
-    div.classList.add('message__container');
-    div.classList.add(messageLocation);
+    div.classList.add('message__container', messageLocation);
     div.innerHTML = `<span class='message__header'>${name}, ${message.time}</span>
-    <p class="message__body">${message.text}</p>
-    `;
+    <p class="message__body">${message.text}</p>`;
     messagesContainer.append(div);
   }
 
   subscribeOnEvents() {
+    this.subscribeToFormMessage();
+    this.subscribeToOutChat();
+  }
+
+  subscribeToFormMessage() {
     const formMessage = this.container.querySelector('.form');
-    formMessage.addEventListener('submit', (e) => {
-      e.preventDefault();
-      this.sendMessage();
-    });
+    formMessage.addEventListener('submit', this.handleSendMessage.bind(this));
+  }
 
+  handleSendMessage(e) {
+    e.preventDefault();
+    this.sendMessage();
+  }
+
+  subscribeToOutChat() {
     const outChat = this.container.querySelector('.chat__connect');
-    outChat.addEventListener('click', () => {
-      if (this.user === null) return;
-      const receivedMessage = {
-        type: 'exit',
-        user: { name: this.user },
-      };
-      this.websocket.send(JSON.stringify(receivedMessage));
+    outChat.addEventListener('click', this.handleOutChat.bind(this));
+  }
 
-      const root = document.querySelector('#root');
-      console.log(root);
+  handleOutChat() {
+    if (this.user === null) return;
+    const receivedMessage = {
+      type: 'exit',
+      user: { name: this.user },
+    };
+    this.websocket.send(JSON.stringify(receivedMessage));
 
-      root.textContent = '';
-      this.websocket.close();
-      this.user = null;
-      this.userId = null;
-      this.init();
-    });
+    const root = document.querySelector('#root');
+    root.textContent = '';
+    this.websocket.close();
+    this.user = null;
+    this.userId = null;
+    this.init();
   }
 
   websocketOnEvents() {
-    this.websocket.addEventListener('open', (e) => {
-      console.log(e);
-      console.log('ws open');
-    });
+    this.websocket.addEventListener(
+      'open',
+      this.handleWebSocketOpen.bind(this),
+    );
+    this.websocket.addEventListener(
+      'message',
+      this.handleWebSocketMessage.bind(this),
+    );
+    this.websocket.addEventListener(
+      'close',
+      this.handleWebSocketClose.bind(this),
+    );
+  }
 
-    this.websocket.addEventListener('message', (e) => {
-      const data = JSON.parse(e.data);
-      if (Object.getPrototypeOf(data).constructor === Array) {
-        if (this.user === null) return;
-        const list = this.container.querySelector('.chat__userlist');
-        list.innerHTML = '';
-        // eslint-disable-next-line array-callback-return
-        data.map((el) => {
-          this.renderUser(el.name);
-        });
-        this.userId = data[data.length - 1].id;
-      }
+  handleWebSocketOpen(e) {
+    console.log(e);
+    console.log('ws open');
+  }
 
-      if (Object.getPrototypeOf(data).constructor === Object) {
-        if (data.type === 'send') {
-          this.createMessage(data);
-        }
-        if (data.type === 'exit') {
-          console.log(e);
-        }
-      }
-    });
+  handleWebSocketMessage(e) {
+    const data = JSON.parse(e.data);
+    if (Array.isArray(data)) {
+      this.handleUserList(data);
+    } else if (typeof data === 'object') {
+      this.handleIncomingMessage(data);
+    }
+  }
 
-    this.websocket.addEventListener('close', (e) => {
-      console.log(e);
-      console.log('ws close');
+  handleUserList(data) {
+    if (this.user === null) return;
+    const list = this.container.querySelector('.chat__userlist');
+    list.innerHTML = '';
+    data.forEach((el) => {
+      this.renderUser(el.name);
     });
+    this.userId = data[data.length - 1].id;
+  }
+
+  handleIncomingMessage(data) {
+    if (data.type === 'send') {
+      this.createMessage(data);
+    }
+    if (data.type === 'exit') {
+      console.log('Пользователь вышел:', data);
+    }
+  }
+
+  handleWebSocketClose(e) {
+    console.log(e);
+    console.log('ws close');
   }
 
   onEnterChatHandler() {
     const { formInput, form, modalClose } = this.modal;
-    form.addEventListener('submit', (e) => {
-      e.preventDefault();
-      if (formInput.value.trim()) {
-        const data = { name: formInput.value };
-        fetch('https://ahj-sse-ws-server-jnxt.onrender.com/new-user', {
-          method: 'POST',
-          body: JSON.stringify(data),
-        }).then((responce) => {
-          if (responce.ok === true && responce.status === 200) {
-            this.user = formInput.value;
-            this.modal.deleteModal();
-            this.bindToDOM();
-            this.websocket = new WebSocket('wss://ahj-sse-ws-server-jnxt.onrender.com');
-            this.websocketOnEvents();
-            this.subscribeOnEvents();
-          }
-          if (responce.status === 409 || responce.status === 400) {
-            this.modal.showError();
-          }
-          console.log(responce);
-        });
-      }
-    });
+    form.addEventListener('submit', this.handleUserEntry.bind(this));
     modalClose.addEventListener('click', () => {
       this.modal.deleteModal();
+    });
+  }
+
+  handleUserEntry(e) {
+    e.preventDefault();
+    const { formInput } = this.modal;
+    if (formInput.value.trim()) {
+      const data = { name: formInput.value };
+      this.registerNewUser(data);
+    }
+  }
+
+  registerNewUser(data) {
+    fetch(`${BASE_URL}/new-user`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }).then((response) => {
+      if (response.ok) {
+        this.user = data.name;
+        this.modal.deleteModal();
+        this.bindToDOM();
+        this.websocket = new WebSocket(`${BASE_URL}`);
+        this.websocketOnEvents();
+        this.subscribeOnEvents();
+      } else if (response.status === 409 || response.status === 400) {
+        this.modal.showError();
+      }
+      console.log(response);
     });
   }
 
